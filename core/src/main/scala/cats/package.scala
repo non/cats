@@ -10,21 +10,21 @@ package object cats {
   type ⊤ = Any
 
 
-/**
- * Identity, encoded as `type Id[A] = A`, a convenient alias to make
- * identity instances well-kinded.
- *
- * The identity monad can be seen as the ambient monad that encodes
- * the effect of having no effect. It is ambient in the sense that
- * plain pure values are values of `Id`.
- *
- * For instance, the [[cats.Functor]] instance for `[[cats.Id]]`
- * allows us to apply a function `A => B` to an `Id[A]` and get an
- * `Id[B]`. However, an `Id[A]` is the same as `A`, so all we're doing
- * is applying a pure function of type `A => B` to a pure value  of
- * type `A` to get a pure value of type `B`. That is, the instance
- * encodes pure unary function application.
- */
+  /**
+   * Identity, encoded as `type Id[A] = A`, a convenient alias to make
+   * identity instances well-kinded.
+   *
+   * The identity monad can be seen as the ambient monad that encodes
+   * the effect of having no effect. It is ambient in the sense that
+   * plain pure values are values of `Id`.
+   *
+   * For instance, the [[cats.Functor]] instance for `[[cats.Id]]`
+   * allows us to apply a function `A => B` to an `Id[A]` and get an
+   * `Id[B]`. However, an `Id[A]` is the same as `A`, so all we're doing
+   * is applying a pure function of type `A => B` to a pure value  of
+   * type `A` to get a pure value of type `B`. That is, the instance
+   * encodes pure unary function application.
+   */
   type Id[A] = A
   implicit val Id: Bimonad[Id] =
     new Bimonad[Id] {
@@ -38,7 +38,7 @@ package object cats {
       override def map2[A, B, Z](fa: A, fb: B)(f: (A, B) => Z): Z = f(fa, fb)
       override def lift[A, B](f: A => B): A => B = f
       override def imap[A, B](fa: A)(f: A => B)(fi: B => A): B = f(fa)
-  }
+    }
 
   type Eq[A] = algebra.Eq[A]
   type PartialOrder[A] = algebra.PartialOrder[A]

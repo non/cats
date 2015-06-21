@@ -26,4 +26,7 @@ package object data {
         Fold.Continue { case OneAnd(h, t) => OneAnd(a, h :: t) }
       }
   }
+
+  type Cont[R, A] = ContT[R, Id, A]
+
 }

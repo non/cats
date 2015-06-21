@@ -2,7 +2,7 @@ package cats
 package laws
 package discipline
 
-import cats.data.{Cokleisli, Kleisli, Validated, Xor, XorT, Ior, Const}
+import cats.data.{Cokleisli, Kleisli, Validated, Xor, XorT, Ior, Const, ContT}
 import cats.laws.discipline.arbitrary._
 import org.scalacheck.Arbitrary
 
@@ -89,6 +89,12 @@ object ArbitraryK {
     new ArbitraryK[Future] {
       def synthesize[A](implicit A: Arbitrary[A]): Arbitrary[Future[A]] =
         Arbitrary(A.arbitrary.map(Future.successful))
+    }
+
+  implicit def contTArbitraryK[R, M[_]](implicit MR: Arbitrary[M[R]]): ArbitraryK[ContT[R, M, ?]] =
+    new ArbitraryK[ContT[R, M, ?]] {
+      def synthesize[A](implicit A: Arbitrary[A]): Arbitrary[ContT[R, M, A]] =
+        Arbitrary(Arbitrary.arbitrary[(A => M[R]) => M[R]].map(ContT(_)))
     }
 
   implicit val set: ArbitraryK[Set] =

@@ -4,6 +4,7 @@ package discipline
 
 import algebra.Eq
 import org.scalacheck.Arbitrary
+import cats.data.ContT
 
 object eq {
 
@@ -42,4 +43,9 @@ object eq {
     }
   }
 
+  /**
+   * Approximate Eq[ContT[R, M, A]] via approximate Eq for functions.
+   */
+  implicit def contTEq[R, M[_], A](implicit ev: Eq[M[R]], arb: Arbitrary[M[R]]): Eq[ContT[R, M, A]] =
+    Eq.by(_.run _)
 }
