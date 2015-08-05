@@ -30,8 +30,8 @@ action. The next section uses `Free[_]` to create an embedded DSL
 (Domain Specific Language).
 
 If you're interested in the theory behind *free monads*, the
-[What is Free in theory?]() section discusses free moands in terms of
-category theory.
+[What is Free in theory?](#what-is-free-in-theory) section discusses free monads
+in terms of category theory.
 
 ### Study your topic
 
@@ -88,13 +88,13 @@ operation with successive values. The `Next` type parameter can be
 anything at all, including `Unit`. It can be thought of as a carrier,
 a way to link a single operation with successive operations.
 
-As we will see, the `next` field is also necessary to allowing us to
+As we will see, the `next` field is also necessary to allow us to
 provide a `Functor` instance for `KVStoreA[_]`.
 
 ### Import Free in your `build.sbt`
 
 ```scala
-libraryDependencies += "cats" %% "cats-free" % "0.1.0-SNAPSHOT"
+libraryDependencies += "cats" %% "cats-free" % "0.1.2"
 ```
 
 ### Free your ADT
@@ -213,7 +213,7 @@ ten thousand operations, we might run out of stack space and trigger a
 
 #### 5. Write a compiler for your program
 
-As you may have understood now, `Free[_]` used to create an embedded
+As you may have understood now, `Free[_]` is used to create an embedded
 DSL. By itself, this DSL only represents a sequence of operations
 (defined by a recursive data structure); it doesn't produce anything.
 
@@ -346,15 +346,15 @@ def compilePure[A](program: KVStore[A], kvs: Map[String, A]): Map[String, A] =
     })
 ```
 
-(You can see that we are again running into some places where scala's
-support for pattern matching is limited by the JVM's type erausre, but
+(You can see that we are again running into some places where Scala's
+support for pattern matching is limited by the JVM's type erasure, but
 it's not too hard to get around.)
 
 ```tut
 val result: Map[String, Int] = compilePure(program, Map.empty)
 ```
 
-## For the curious ones: what is Free in theory?
+## <a name="what-is-free-in-theory"></a>For the curious ones: what is Free in theory?
 
 Mathematically-speaking, a *free monad* (at least in the programming
 language context) is a construction that is left adjoint to a

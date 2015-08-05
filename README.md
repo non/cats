@@ -11,8 +11,32 @@ The name is a playful shortening of the word *category*.
 
 ### Getting Started
 
-Cats is not currently published, so you'll need to check out this
-repository to try it out.
+Cats is currently available for Scala 2.10 and 2.11.
+
+To get started with SBT, simply add the following to your `build.sbt`
+file:
+
+```scala
+libraryDependencies += "org.spire-math" %% "cats" % "0.1.2"
+```
+
+This will pull in all of Cats' modules. If you only require some
+functionality, you can pick-and-choose from amongst these modules
+(used in place of `"cats"`):
+
+ * `cats-macros`: Macros used by Cats syntax (*required*).
+ * `cats-core`: Core type classes and functionality (*required*).
+ * `cats-std`: Type class instances for the standard library (*recommended*).
+ * `cats-laws`: Laws for testing type class instances.
+ * `cats-free`: "Free" data constructors for various type classes.
+ * `cats-state`: Monad and transformer support for state.
+
+Release notes for Cats are available in [CHANGES.md](CHANGES.md).
+
+*Cats 0.1.2 is a pre-release: there are not currently source- or
+binary-compatibility guarantees.*
+
+### Building Cats
 
 To build Cats you should have [sbt](http://www.scala-sbt.org/0.13/tutorial/Setup.html)
 installed. Run `sbt`, and then use any of the following commands:
@@ -81,15 +105,15 @@ There are many ways to support Cats' development:
  * Fix bugs: Despite using static types, law-checking, and
    property-based testing bugs can happen. Reporting problems you
    encounter (with the documentation, code, or anything else) helps us
-   to improve. Look for issues labelled "ready" as good targets, but 
-   **please add a comment to the issue** if you start working on one. 
+   to improve. Look for issues labelled "ready" as good targets, but
+   **please add a comment to the issue** if you start working on one.
    We want to avoid any duplicated effort.
 
  * Write ScalaDoc comments: One of our goals is to have ScalaDoc
    comments for all types in Cats. The documentation should describe
    the type and give a basic usage (it may also link to relevant
    papers).
-   
+
  * Write tutorials and examples: In addition to inline ScalaDoc
    comments, we hope to provide Markdown-based tutorials which can
    demonstrate how to use all the provided types. These should be
@@ -104,7 +128,7 @@ There are many ways to support Cats' development:
    through conversations on issues and pull requests. You can
    participate in these conversations to help guide the future of
    Cats.
-   
+
    We will be using the **meta** label for large design decisions, and
    your input on these is especially appreciated.
 
@@ -113,7 +137,7 @@ There are many ways to support Cats' development:
    can open an issue to discuss your idea, or start hacking and submit
    a pull request. One advantage of opening an issue is that it may
    save you time to get other opinions on your approach.
-   
+
  * Ask questions: we are hoping to make Cats (and functional
    programming in Scala) accessible to the largest number of
    people. If you have questions it is likely many other people do as
@@ -126,6 +150,7 @@ The current maintainers (people who can merge pull requests) are:
  * [ceedubs](https://github.com/ceedubs) Cody Allen
  * [rossabaker](https://github.com/rossabaker) Ross Baker
  * [travisbrown](https://github.com/travisbrown) Travis Brown
+ * [adelbertc](https://github.com/adelbertc) Adelbert Chang
  * [tpolecat](https://github.com/tpolecat) Rob Norris
  * [stew](https://github.com/stew) Mike O'Connor
  * [non](https://github.com/non) Erik Osheim
@@ -147,7 +172,9 @@ via [Waffle.io](https://waffle.io/non/cats).
 
 Feel free to open an issue if you notice a bug, have an idea for a
 feature, or have a question about the code. Pull requests are also
-gladly accepted. For more information, check out the [contributor guide](CONTRIBUTING.md).
+gladly accepted. For more information, check out the
+[contributor guide](CONTRIBUTING.md). You can also see a list of past
+contributors in [AUTHORS.md](AUTHORS.md).
 
 People are expected to follow the
 [Typelevel Code of Conduct](http://typelevel.org/conduct.html) when

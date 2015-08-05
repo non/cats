@@ -31,10 +31,10 @@ trait OptionInstances {
           case Some(a) => f(b, a)
         }
 
-      def partialFold[A, B](fa: Option[A])(f: A => Fold[B]): Fold[B] =
+      def foldRight[A, B](fa: Option[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
         fa match {
-          case None => Fold.Pass
-          case Some(a) => f(a)
+          case None => lb
+          case Some(a) => f(a, lb)
         }
 
       def traverse[G[_]: Applicative, A, B](fa: Option[A])(f: A => G[B]): G[Option[B]] =
@@ -42,6 +42,14 @@ trait OptionInstances {
           case None => Applicative[G].pure(None)
           case Some(a) => Applicative[G].map(f(a))(Some(_))
         }
+
+      override def exists[A](fa: Option[A])(p: A => Boolean): Boolean =
+        fa.exists(p)
+
+      override def forall[A](fa: Option[A])(p: A => Boolean): Boolean =
+        fa.forall(p)
+
+      override def isEmpty[A](fa: Option[A]): Boolean = fa.isEmpty
     }
 
   // TODO: eventually use algebra's instances (which will deal with

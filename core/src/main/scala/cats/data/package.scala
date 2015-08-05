@@ -22,9 +22,17 @@ package object data {
     OneAnd(head, tail.toStream)
 
   object NonEmptyList {
-    def fromReducible[F[_], A](fa: F[A])(implicit F: Reducible[F]): Lazy[NonEmptyList[A]] =
-      F.reduceRightTo(fa)(a => NonEmptyList(a, Nil)) { a =>
-        Fold.Continue { case OneAnd(h, t) => OneAnd(a, h :: t) }
+    def fromReducible[F[_], A](fa: F[A])(implicit F: Reducible[F]): Eval[NonEmptyList[A]] =
+      F.reduceRightTo(fa)(a => NonEmptyList(a, Nil)) { (a, lnel) =>
+        lnel.map { case OneAnd(h, t) => OneAnd(a, h :: t) }
       }
+  }
+
+  type ReaderT[F[_], A, B] = Kleisli[F, A, B]
+  val ReaderT = Kleisli
+
+  type Reader[A, B] = ReaderT[Id, A, B]
+  object Reader {
+    def apply[A, B](f: A => B): Reader[A, B] = ReaderT.function[Id, A, B](f)
   }
 }
