@@ -1,6 +1,8 @@
 package cats
 package macros
 
+import algebra.Eq
+
 import scala.reflect.macros.whitebox.Context
 
 object Tags {
@@ -55,28 +57,28 @@ object Tags {
     c.Expr[F[A]](q"$fat.asInstanceOf[$FA]")
   }
 
-  // def wrapkMacro[F[_[_]], G[_], T: c.WeakTypeTag](c: Context)(fg: c.Tree)(implicit F: c.WeakTypeTag[F[List]], G: c.WeakTypeTag[G[_]]): c.Tree = {
-  //   import c.universe._
-  //   val A = internal.typeDef(G.tpe.typeParams.head)
-  //   val LGT = typeLambda(c)(List(A), TypeTree(appliedType(G.tpe.typeConstructor, List(A.tpe))))
-  //   val FGT = appliedType(F.tpe.typeConstructor, List(LGT))
-  //   q"$fg.asInstanceOf[$FGT]"
-  // }
-  // 
-  // def unwrapkMacro[F[_[_]], G[_], T](c: Context)(fgt: c.Tree)(implicit F: c.WeakTypeTag[F[List]], G: c.WeakTypeTag[G[_]]): c.Tree = {
-  //   import c.universe._
-  //   val FG = appliedType(F.tpe.typeConstructor, List(G.tpe))
-  //   q"$fgt.asInstanceOf[$FG]"
-  // }
-  // 
-  // def typeLambda(c: Context)(params: List[c.universe.TypeDef], body: c.universe.TypeTree): c.universe.Type = {
-  //   import c.universe._
-  //   val L = TypeName("L$")
-  //   SelectFromTypeTree(
-  //     CompoundTypeTree(
-  //       Template(
-  //         q"_root_.scala.AnyRef" :: Nil,
-  //         ValDef(NoMods, termNames.WILDCARD, TypeTree(), EmptyTree),
-  //         TypeDef(NoMods, L, params, body) :: Nil)), L).tpe
-  // }
+  def wrapkMacro[F[_[_]], G[_], T: c.WeakTypeTag](c: Context)(fg: c.Tree)(implicit F: c.WeakTypeTag[F[List]], G: c.WeakTypeTag[G[_]]): c.Tree = {
+    import c.universe._
+    val A = internal.typeDef(G.tpe.typeParams.head)
+    val LGT = typeLambda(c)(List(A), TypeTree(appliedType(G.tpe.typeConstructor, List(A.tpe))))
+    val FGT = appliedType(F.tpe.typeConstructor, List(LGT))
+    q"$fg.asInstanceOf[$FGT]"
+  }
+
+  def unwrapkMacro[F[_[_]], G[_], T](c: Context)(fgt: c.Tree)(implicit F: c.WeakTypeTag[F[List]], G: c.WeakTypeTag[G[_]]): c.Tree = {
+    import c.universe._
+    val FG = appliedType(F.tpe.typeConstructor, List(G.tpe))
+    q"$fgt.asInstanceOf[$FG]"
+  }
+
+  def typeLambda(c: Context)(params: List[c.universe.TypeDef], body: c.universe.TypeTree): c.universe.Type = {
+    import c.universe._
+    val L = TypeName("L$")
+    SelectFromTypeTree(
+      CompoundTypeTree(
+        Template(
+          q"_root_.scala.AnyRef" :: Nil,
+          ValDef(NoMods, termNames.WILDCARD, TypeTree(), EmptyTree),
+          TypeDef(NoMods, L, params, body) :: Nil)), L).tpe
+  }
 }
