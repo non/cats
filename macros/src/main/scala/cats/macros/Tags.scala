@@ -29,6 +29,19 @@ object Tags {
     c.Expr[A](q"$at.asInstanceOf[$A]")
   }
 
+  def tagfMacro[F[_], A: c.WeakTypeTag, T: c.WeakTypeTag](c: Context): c.Expr[Tagged[F[A], T]] = {
+    import c.universe._
+    val AT = appliedType(typeOf[Tagged[_, _]], List(weakTypeOf[A], weakTypeOf[T]))
+    val FAT = appliedType(F.tpe.typeConstructor, List(AT))
+
+    val AT = weakTypeOf[Tagged[F[A], T]]
+    val a = c.prefix.tree match {
+      case Apply(_, List(x)) => x
+      case t => c.abort(c.enclosingPosition, s"Cannot extract .tag target (tree = $t)")
+    }
+    c.Expr[Tagged[A, T]](q"$a.asInstanceOf[$FAT]")
+  }
+
   def wrapMacro[A: c.WeakTypeTag, T: c.WeakTypeTag](c: Context)(a: c.Expr[A]): c.Expr[Tagged[A, T]] = {
     import c.universe._
     val A = weakTypeOf[A]
@@ -55,30 +68,5 @@ object Tags {
     import c.universe._
     val FA = appliedType(F.tpe.typeConstructor, List(weakTypeOf[A]))
     c.Expr[F[A]](q"$fat.asInstanceOf[$FA]")
-  }
-
-  def wrapkMacro[F[_[_]], G[_], T: c.WeakTypeTag](c: Context)(fg: c.Tree)(implicit F: c.WeakTypeTag[F[List]], G: c.WeakTypeTag[G[_]]): c.Tree = {
-    import c.universe._
-    val A = internal.typeDef(G.tpe.typeParams.head)
-    val LGT = typeLambda(c)(List(A), TypeTree(appliedType(G.tpe.typeConstructor, List(A.tpe))))
-    val FGT = appliedType(F.tpe.typeConstructor, List(LGT))
-    q"$fg.asInstanceOf[$FGT]"
-  }
-
-  def unwrapkMacro[F[_[_]], G[_], T](c: Context)(fgt: c.Tree)(implicit F: c.WeakTypeTag[F[List]], G: c.WeakTypeTag[G[_]]): c.Tree = {
-    import c.universe._
-    val FG = appliedType(F.tpe.typeConstructor, List(G.tpe))
-    q"$fgt.asInstanceOf[$FG]"
-  }
-
-  def typeLambda(c: Context)(params: List[c.universe.TypeDef], body: c.universe.TypeTree): c.universe.Type = {
-    import c.universe._
-    val L = TypeName("L$")
-    SelectFromTypeTree(
-      CompoundTypeTree(
-        Template(
-          q"_root_.scala.AnyRef" :: Nil,
-          ValDef(NoMods, termNames.WILDCARD, TypeTree(), EmptyTree),
-          TypeDef(NoMods, L, params, body) :: Nil)), L).tpe
   }
 }
