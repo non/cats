@@ -1,5 +1,4 @@
-package cats
-package macros
+package cats.macros
 
 import algebra.Eq
 
@@ -29,17 +28,15 @@ object Tags {
     c.Expr[A](q"$at.asInstanceOf[$A]")
   }
 
-  def tagfMacro[F[_], A: c.WeakTypeTag, T: c.WeakTypeTag](c: Context): c.Expr[Tagged[F[A], T]] = {
+  def tagfMacro[F[_], A: c.WeakTypeTag, T: c.WeakTypeTag](c: Context)(implicit F: c.WeakTypeTag[F[_]]): c.Expr[Tagged[F[A], T]] = {
     import c.universe._
     val AT = appliedType(typeOf[Tagged[_, _]], List(weakTypeOf[A], weakTypeOf[T]))
     val FAT = appliedType(F.tpe.typeConstructor, List(AT))
-
-    val AT = weakTypeOf[Tagged[F[A], T]]
     val a = c.prefix.tree match {
       case Apply(_, List(x)) => x
       case t => c.abort(c.enclosingPosition, s"Cannot extract .tag target (tree = $t)")
     }
-    c.Expr[Tagged[A, T]](q"$a.asInstanceOf[$FAT]")
+    c.Expr[Tagged[F[A], T]](q"$a.asInstanceOf[$FAT]")
   }
 
   def wrapMacro[A: c.WeakTypeTag, T: c.WeakTypeTag](c: Context)(a: c.Expr[A]): c.Expr[Tagged[A, T]] = {

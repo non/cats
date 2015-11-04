@@ -1,11 +1,10 @@
 package cats
 
 package object std {
-  object all      extends AllInstances
+  object all        extends AllInstances
 
-  object either extends EitherInstances
-  object function extends FunctionInstances
-
+  object either     extends EitherInstances
+  object function   extends FunctionInstances
   object list       extends ListInstances
   object option     extends OptionInstances
   object set        extends SetInstances
@@ -28,5 +27,5 @@ package object std {
   object bigInt     extends BigIntInstances
   object bigDecimal extends BigDecimalInstances
 
-  object tag extends TagInstances
+  object tag        extends TagInstances
 }

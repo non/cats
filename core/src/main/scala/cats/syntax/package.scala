@@ -27,6 +27,7 @@ package object syntax {
   object split extends SplitSyntax
   object streaming extends StreamingSyntax
   object strong extends StrongSyntax
+  object tag extends TagSyntax
   object traverse extends TraverseSyntax
   object xor extends XorSyntax
   object validated extends ValidatedSyntax

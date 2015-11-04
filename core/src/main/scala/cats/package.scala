@@ -9,6 +9,7 @@ package object cats {
   type ⊥ = Nothing
   type ⊤ = Any
 
+  type @@[A, T] = cats.macros.Tags.Tagged[A, T]
 
 /**
  * Identity, encoded as `type Id[A] = A`, a convenient alias to make
