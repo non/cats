@@ -61,3 +61,39 @@ object ContT {
         co.flatMap(f)
     }
 }
+
+object Main {
+
+  type Cont[R, A] = ContT[R, Id, A]
+
+  object Cont {
+    def apply[R, A](a: A): Cont[R, A] =
+      ContT[R, Id, A](a)
+
+    def apply[R, A](c: (A => R) => R): Cont[R, A] =
+      ContT[R, Id, A](c)
+
+    def eval[R](co: Cont[R, R]): R =
+      ContT.eval[R, Id](co)
+
+    def callCC[R, A, B](f: (A => Cont[R, B]) => Cont[R, A]): Cont[R, A] =
+      ContT.callCC[R, Id, A, B](f)
+
+    def shift[R, A](f: (A => R) => Cont[R, R]): Cont[R, A] =
+      ContT.shift[R, Id, A](f)
+
+    def reset[R, R1](co: Cont[R, R]): Cont[R1, R] =
+      ContT.reset[R, Id, R1](co)
+  }
+
+  import cats.data.Streaming
+
+  sealed abstract class SearchTree[A]
+  case class Leaf[A](a: A) extends SearchTree[A]
+  case class Node[A](fs: Streaming[() => SearchTree[A]]) extends SearchTree[A]
+
+  def choose[A, W](as: Streaming[A]): Cont[SearchTree[W], A] = ???
+  def reify[A](c: Cont[SearchTree[A], A]): SearchTree[A] = ???
+
+  def main(args: Array[String]): Unit = ()
+}
