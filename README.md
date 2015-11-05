@@ -1,5 +1,11 @@
 ## Cats
 
+[![Build Status](https://api.travis-ci.org/non/cats.png)](https://travis-ci.org/non/cats)
+[![Workflow](https://badge.waffle.io/non/cats.png?label=ready&title=Ready)](https://waffle.io/non/cats)
+[![Chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/non/cats)
+[![codecov.io](http://codecov.io/github/non/cats/coverage.svg?branch=master)](http://codecov.io/github/non/cats?branch=master)
+[![Maven Central](https://img.shields.io/maven-central/v/org.spire-math/cats_2.11.svg)](https://maven-badges.herokuapp.com/maven-central/org.spire-math/cats_2.11)
+
 ### Overview
 
 Cats is a proof-of-concept library intended to provide abstractions
@@ -11,11 +17,42 @@ The name is a playful shortening of the word *category*.
 
 ### Getting Started
 
-Cats is not currently published, so you'll need to check out this
-repository to try it out.
+Cats is currently available for Scala 2.10 and 2.11.
 
-To build Cats you should have [sbt](http://www.scala-sbt.org/0.13/tutorial/Setup.html)
-installed. Run `sbt`, and then use any of the following commands:
+To get started with SBT, simply add the following to your `build.sbt`
+file:
+
+```scala
+libraryDependencies += "org.spire-math" %% "cats" % "0.2.0"
+```
+
+This will pull in all of Cats' modules. If you only require some
+functionality, you can pick-and-choose from amongst these modules
+(used in place of `"cats"`):
+
+ * `cats-macros`: Macros used by Cats syntax (*required*).
+ * `cats-core`: Core type classes and functionality (*required*).
+ * `cats-laws`: Laws for testing type class instances.
+ * `cats-free`: "Free" data constructors for various type classes.
+ * `cats-state`: Monad and transformer support for state.
+
+Release notes for Cats are available in [CHANGES.md](CHANGES.md).
+
+*Cats 0.2.0 is a pre-release: there are not currently source- or
+binary-compatibility guarantees.*
+
+### Documentation
+Among the goals of Cats is to provide approachable and useful documentation.
+Documentation is available in the form of tutorials on the Cats
+[website](http://non.github.io/cats/), as well as through
+[Scaladoc](http://non.github.io/cats/api/#package) (also reachable through
+the website).
+
+### Building Cats
+
+To build Cats you should have
+[sbt](http://www.scala-sbt.org/0.13/tutorial/Setup.html) and [Node.js](https://nodejs.org/)
+ installed. Run `sbt`, and then use any of the following commands:
 
  * `compile`: compile the code
  * `console`: launch a REPL
@@ -24,10 +61,18 @@ installed. Run `sbt`, and then use any of the following commands:
  * `scalastyle`: run the style-checker on the code
  * `validate`: run tests, style-checker, and doc generation
 
-[![Build Status](https://api.travis-ci.org/non/cats.png)](https://travis-ci.org/non/cats)
-[![Workflow](https://badge.waffle.io/non/cats.png?label=ready&title=Ready)](https://waffle.io/non/cats)
-[![Chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/non/cats)
-[![codecov.io](http://codecov.io/github/non/cats/coverage.svg?branch=master)](http://codecov.io/github/non/cats?branch=master)
+#### Scala and Scala-js
+
+Cats cross-compiles to both JVM and Javascript(JS). If you are not used to
+working with cross-compiling builds, the first things that you will notice is that
+builds:
+
+ * Will take longer: To build JVM only, just use the `catsJVM`, or `catsJS` for
+   JS only. And if you want the default project to be `catsJVM`, just copy the
+   file `scripts/sbtrc-JVM` to `.sbtrc` in the root directory.
+
+ * May run out of memory: We suggest you use
+   [Paul Philips's sbt script](https://github.com/paulp/sbt-extras) that will use the settings from Cats.
 
 ### Design
 
@@ -38,7 +83,7 @@ ensure correctness.
 
 Cats will be designed to use modern *best practices*:
 
- * [simulacrum](https://github.com/mpilquist/simulacrum) for minimizing typeclass boilerplate
+ * [simulacrum](https://github.com/mpilquist/simulacrum) for minimizing type class boilerplate
  * [machinist](https://github.com/typelevel/machinist) for optimizing implicit operators
  * [scalacheck](http://scalacheck.org) for property-based testing
  * [discipline](https://github.com/typelevel/discipline) for encoding and testing laws
@@ -49,7 +94,7 @@ Cats will be designed to use modern *best practices*:
 (We also plan to support [Miniboxing](http://scala-miniboxing.org) in a branch.)
 
 Currently Cats is experimenting with providing laziness via a type
-constructor (`Lazy[_]`), rather than via ad-hoc by-name
+constructor (`Eval[_]`), rather than via ad-hoc by-name
 parameters.This design may change if it ends up being impractical.
 
 The goal is to make Cats as efficient as possible for both strict and
@@ -65,9 +110,11 @@ type classes and data types.
 
 Initially Cats will support the following modules:
 
- * `core`: Definitions for widely-used type classes and data types
- * `std`: Standard type class instances and other useful data types.
+ * `macros`: Macro definitions needed for `core` and other projects.
+ * `core`: Definitions for widely-used type classes and data types.
  * `laws`: The encoded laws for type classes, exported to assist third-party testing.
+ * `free`: "Free" data constructors for various type classes.
+ * `state`: Monad and transformer support for state.
  * `tests`: Verifies the laws, and runs any other tests. Not published.
 
 As the type class families grow, it's possible that additional modules
@@ -81,15 +128,15 @@ There are many ways to support Cats' development:
  * Fix bugs: Despite using static types, law-checking, and
    property-based testing bugs can happen. Reporting problems you
    encounter (with the documentation, code, or anything else) helps us
-   to improve. Look for issues labelled "ready" as good targets, but 
-   **please add a comment to the issue** if you start working on one. 
+   to improve. Look for issues labelled "ready" as good targets, but
+   **please add a comment to the issue** if you start working on one.
    We want to avoid any duplicated effort.
 
  * Write ScalaDoc comments: One of our goals is to have ScalaDoc
    comments for all types in Cats. The documentation should describe
    the type and give a basic usage (it may also link to relevant
    papers).
-   
+
  * Write tutorials and examples: In addition to inline ScalaDoc
    comments, we hope to provide Markdown-based tutorials which can
    demonstrate how to use all the provided types. These should be
@@ -104,7 +151,7 @@ There are many ways to support Cats' development:
    through conversations on issues and pull requests. You can
    participate in these conversations to help guide the future of
    Cats.
-   
+
    We will be using the **meta** label for large design decisions, and
    your input on these is especially appreciated.
 
@@ -113,7 +160,7 @@ There are many ways to support Cats' development:
    can open an issue to discuss your idea, or start hacking and submit
    a pull request. One advantage of opening an issue is that it may
    save you time to get other opinions on your approach.
-   
+
  * Ask questions: we are hoping to make Cats (and functional
    programming in Scala) accessible to the largest number of
    people. If you have questions it is likely many other people do as
@@ -126,6 +173,7 @@ The current maintainers (people who can merge pull requests) are:
  * [ceedubs](https://github.com/ceedubs) Cody Allen
  * [rossabaker](https://github.com/rossabaker) Ross Baker
  * [travisbrown](https://github.com/travisbrown) Travis Brown
+ * [adelbertc](https://github.com/adelbertc) Adelbert Chang
  * [tpolecat](https://github.com/tpolecat) Rob Norris
  * [stew](https://github.com/stew) Mike O'Connor
  * [non](https://github.com/non) Erik Osheim
@@ -136,7 +184,8 @@ The current maintainers (people who can merge pull requests) are:
 
 We are currently following a practice of requiring at least two
 sign-offs to merge PRs (and for large or contentious issues we may
-wait for more).
+wait for more). For typos or other small fixes to documentation we
+relax this to a single sign-off.
 
 ### Contributing
 
@@ -147,7 +196,9 @@ via [Waffle.io](https://waffle.io/non/cats).
 
 Feel free to open an issue if you notice a bug, have an idea for a
 feature, or have a question about the code. Pull requests are also
-gladly accepted. For more information, check out the [contributor guide](CONTRIBUTING.md).
+gladly accepted. For more information, check out the
+[contributor guide](CONTRIBUTING.md). You can also see a list of past
+contributors in [AUTHORS.md](AUTHORS.md).
 
 People are expected to follow the
 [Typelevel Code of Conduct](http://typelevel.org/conduct.html) when

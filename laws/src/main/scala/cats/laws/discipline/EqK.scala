@@ -2,21 +2,21 @@ package cats
 package laws
 package discipline
 
-import cats.data.{Cokleisli, Kleisli, Validated, Xor, XorT, Ior, Const}
-import cats.laws.discipline.arbitrary._
-import org.scalacheck.Arbitrary
-
+import cats.data._
 import cats.implicits._
+import eq.tuple2Eq
 
-import scala.concurrent.Future
+import org.scalacheck.Arbitrary
 
 trait EqK[F[_]] {
   def synthesize[A: Eq]: Eq[F[A]]
 }
 
 object EqK {
-
   def apply[F[_]](implicit eqk: EqK[F]): EqK[F] = eqk
+
+  implicit val nonEmptyList: EqK[NonEmptyList] =
+    new EqK[NonEmptyList] { def synthesize[A: Eq]: Eq[NonEmptyList[A]] = implicitly }
 
   implicit val option: EqK[Option] =
     new EqK[Option] { def synthesize[A: Eq]: Eq[Option[A]] = implicitly }
@@ -33,8 +33,8 @@ object EqK {
   implicit val list: EqK[List] =
     new EqK[List] { def synthesize[A: Eq]: Eq[List[A]] = implicitly }
 
-  implicit val lazy_ : EqK[Lazy] =
-    new EqK[Lazy] { def synthesize[A: Eq]: Eq[Lazy[A]] = implicitly }
+  implicit val eval: EqK[Eval] =
+    new EqK[Eval] { def synthesize[A: Eq]: Eq[Eval[A]] = implicitly }
 
   implicit def mapA[B: Eq]: EqK[Map[?, B]] =
     new EqK[Map[?, B]] { def synthesize[A: Eq]: Eq[Map[A, B]] = implicitly }
@@ -83,4 +83,42 @@ object EqK {
 
   implicit val vector: EqK[Vector] =
     new EqK[Vector] { def synthesize[A: Eq]: Eq[Vector[A]] = implicitly }
+
+  implicit val streaming: EqK[Streaming] =
+    new EqK[Streaming] { def synthesize[A: Eq]: Eq[Streaming[A]] = implicitly }
+
+  implicit def streamT[F[_]: EqK: Monad]: EqK[StreamingT[F, ?]] =
+    new EqK[StreamingT[F, ?]] {
+      def synthesize[A: Eq]: Eq[StreamingT[F, A]] = {
+        implicit val eqfla: Eq[F[List[A]]] = EqK[F].synthesize[List[A]]
+        implicitly
+      }
+    }
+
+  implicit def function1L[A: Arbitrary]: EqK[A => ?] =
+    new EqK[A => ?] {
+      def synthesize[B: Eq]: Eq[A => B] =
+        cats.laws.discipline.eq.function1Eq
+    }
+
+  implicit def kleisli[F[_]: EqK, A](implicit evKA: EqK[A => ?]): EqK[Kleisli[F, A, ?]] =
+    new EqK[Kleisli[F, A, ?]] {
+      def synthesize[B: Eq]: Eq[Kleisli[F, A, B]] = {
+        implicit val eqFB: Eq[F[B]] = EqK[F].synthesize[B]
+        implicit val eqAFB: Eq[A => F[B]] = evKA.synthesize[F[B]]
+        eqAFB.on[Kleisli[F, A, B]](_.run)
+      }
+    }
+
+  implicit def optionT[F[_]: EqK]: EqK[OptionT[F, ?]] =
+    new EqK[OptionT[F, ?]] {
+      def synthesize[A: Eq]: Eq[OptionT[F, A]] = {
+        implicit val eqFOA: Eq[F[Option[A]]] = EqK[F].synthesize[Option[A]]
+        implicitly
+      }
+    }
+
+  implicit def writerTEqK[F[_]: EqK, L: Eq]: EqK[WriterT[F, L, ?]] = new EqK[WriterT[F, L, ?]] {
+    def synthesize[A: Eq]: Eq[WriterT[F, L, A]] = EqK[F].synthesize[(L, A)].on(_.run)
+  }
 }

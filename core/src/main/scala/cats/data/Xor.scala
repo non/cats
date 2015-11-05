@@ -1,6 +1,8 @@
 package cats
 package data
 
+import cats.functor.Bifunctor
+
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
@@ -36,8 +38,20 @@ sealed abstract class Xor[+A, +B] extends Product with Serializable {
 
   def getOrElse[BB >: B](default: => BB): BB = fold(_ => default, identity)
 
-  def orElse[AA >: A, BB >: B](fallback: => AA Xor BB): AA Xor BB =
-    fold(_ => fallback, _ => this)
+  def orElse[C, BB >: B](fallback: => C Xor BB): C Xor BB = this match {
+    case Xor.Left(_)      => fallback
+    case r @ Xor.Right(_) => r
+  }
+
+  def recover[BB >: B](pf: PartialFunction[A, BB]): A Xor BB = this match {
+    case Xor.Left(a) if pf.isDefinedAt(a) => Xor.right(pf(a))
+    case _                                => this
+  }
+
+  def recoverWith[AA >: A, BB >: B](pf: PartialFunction[A, AA Xor BB]): AA Xor BB = this match {
+    case Xor.Left(a) if pf.isDefinedAt(a) => pf(a)
+    case _                                => this
+  }
 
   def valueOr[BB >: B](f: A => BB): BB = fold(f, identity)
 
@@ -106,8 +120,8 @@ sealed abstract class Xor[+A, +B] extends Product with Serializable {
 
   def foldLeft[C](c: C)(f: (C, B) => C): C = fold(_ => c, f(c, _))
 
-  def partialFold[C](f: B => Fold[C]): Fold[C] =
-    fold(_ => Fold.Pass, f)
+  def foldRight[C](lc: Eval[C])(f: (B, Eval[C]) => Eval[C]): Eval[C] =
+    fold(_ => lc, b => f(b, lc))
 
   def merge[AA >: A](implicit ev: B <:< AA): AA = fold(identity, ev.apply)
 
@@ -146,14 +160,36 @@ sealed abstract class XorInstances extends XorInstances1 {
       def show(f: A Xor B): String = f.show
     }
 
-  implicit def xorInstances[A]: Traverse[A Xor ?] with Monad[A Xor ?] =
-    new Traverse[A Xor ?] with Monad[A Xor ?] {
+  implicit def xorMonoid[A, B](implicit A: Semigroup[A], B: Monoid[B]): Monoid[A Xor B] =
+    new Monoid[A Xor B] {
+      def empty: A Xor B = Xor.Right(B.empty)
+      def combine(x: A Xor B, y: A Xor B): A Xor B = x combine y
+    }
+
+  implicit def xorBifunctor: Bifunctor[Xor] =
+    new Bifunctor[Xor] {
+      override def bimap[A, B, C, D](fab: A Xor B)(f: A => C, g: B => D): C Xor D = fab.bimap(f, g)
+    }
+
+  implicit def xorInstances[A]: Traverse[A Xor ?] with MonadError[Xor[A, ?], A] =
+    new Traverse[A Xor ?] with MonadError[Xor[A, ?], A] {
       def traverse[F[_]: Applicative, B, C](fa: A Xor B)(f: B => F[C]): F[A Xor C] = fa.traverse(f)
-      def foldLeft[B, C](fa: A Xor B, b: C)(f: (C, B) => C): C = fa.foldLeft(b)(f)
-      def partialFold[B, C](fa: A Xor B)(f: B => Fold[C]): Fold[C] = fa.partialFold(f)
+      def foldLeft[B, C](fa: A Xor B, c: C)(f: (C, B) => C): C = fa.foldLeft(c)(f)
+      def foldRight[B, C](fa: A Xor B, lc: Eval[C])(f: (B, Eval[C]) => Eval[C]): Eval[C] = fa.foldRight(lc)(f)
       def flatMap[B, C](fa: A Xor B)(f: B => A Xor C): A Xor C = fa.flatMap(f)
       def pure[B](b: B): A Xor B = Xor.right(b)
+      def handleErrorWith[B](fea: Xor[A, B])(f: A => Xor[A, B]): Xor[A, B] =
+        fea match {
+          case Xor.Left(e) => f(e)
+          case r @ Xor.Right(_) => r
+        }
+      def raiseError[B](e: A): Xor[A, B] = Xor.left(e)
       override def map[B, C](fa: A Xor B)(f: B => C): A Xor C = fa.map(f)
+      override def attempt[B](fab: A Xor B): A Xor (A Xor B) = Xor.right(fab)
+      override def recover[B](fab: A Xor B)(pf: PartialFunction[A, B]): A Xor B =
+        fab recover pf
+      override def recoverWith[B](fab: A Xor B)(pf: PartialFunction[A, A Xor B]): A Xor B =
+        fab recoverWith pf
     }
 }
 
@@ -184,10 +220,10 @@ trait XorFunctions {
    * val result: NumberFormatException Xor Int = fromTryCatch[NumberFormatException] { "foo".toInt }
    * }}}
    */
-  def fromTryCatch[T >: Null <: Throwable]: FromTryCatchAux[T] =
-    new FromTryCatchAux[T]
+  def fromTryCatch[T >: Null <: Throwable]: FromTryCatchPartiallyApplied[T] =
+    new FromTryCatchPartiallyApplied[T]
 
-  final class FromTryCatchAux[T] private[XorFunctions] {
+  final class FromTryCatchPartiallyApplied[T] private[XorFunctions] {
     def apply[A](f: => A)(implicit T: ClassTag[T]): T Xor A =
       try {
         right(f)

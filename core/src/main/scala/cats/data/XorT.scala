@@ -1,6 +1,8 @@
 package cats
 package data
 
+import cats.functor.Bifunctor
+
 /**
  * Transformer for `Xor`, allowing the effect of an arbitrary type constructor `F` to be combined with the
  * fail-fast effect of `Xor`.
@@ -19,6 +21,17 @@ case class XorT[F[_], A, B](value: F[A Xor B]) {
   def swap(implicit F: Functor[F]): XorT[F, B, A] = XorT(F.map(value)(_.swap))
 
   def getOrElse[BB >: B](default: => BB)(implicit F: Functor[F]): F[BB] = F.map(value)(_.getOrElse(default))
+
+  def recover(pf: PartialFunction[A, B])(implicit F: Functor[F]): XorT[F, A, B] =
+    XorT(F.map(value)(_.recover(pf)))
+
+  def recoverWith(pf: PartialFunction[A, XorT[F, A, B]])(implicit F: Monad[F]): XorT[F, A, B] =
+    XorT(F.flatMap(value) { xor =>
+      xor match {
+        case Xor.Left(a) if pf.isDefinedAt(a) => pf(a).value
+        case _                                => F.pure(xor)
+      }
+    })
 
   def forall(f: B => Boolean)(implicit F: Functor[F]): F[Boolean] = F.map(value)(_.forall(f))
 
@@ -65,20 +78,36 @@ case class XorT[F[_], A, B](value: F[A Xor B]) {
     applicativeG.map(traverseF.traverse(value)(axb => traverseXorA.traverse(axb)(f)))(XorT.apply)
 
   def foldLeft[C](c: C)(f: (C, B) => C)(implicit F: Foldable[F]): C =
-    F.foldLeft(value, c)((c, axb) => axb.fold(_ => c, f(c, _)))
+    F.foldLeft(value, c)((c, axb) => axb.foldLeft(c)(f))
 
-  import Fold.{Return, Continue, Pass}
-
-  def foldRight[C](c: Lazy[C])(f: B => Fold[C])(implicit F: Foldable[F]): Lazy[C] =
-    Lazy(partialFold(f).complete(c))
-
-  def partialFold[C](f: B => Fold[C])(implicit F: Foldable[F]): Fold[C] =
-    F.partialFold(value)(axb => axb.fold(_ => Pass, f))
+  def foldRight[C](lc: Eval[C])(f: (B, Eval[C]) => Eval[C])(implicit F: Foldable[F]): Eval[C] =
+    F.foldRight(value, lc)((axb, lc) => axb.foldRight(lc)(f))
 
   def merge[AA >: A](implicit ev: B <:< AA, F: Functor[F]): F[AA] = F.map(value)(_.fold(identity, ev.apply))
 
   def combine(that: XorT[F, A, B])(implicit F: Apply[F], A: Semigroup[A], B: Semigroup[B]): XorT[F, A, B] =
     XorT(F.map2(this.value, that.value)(_ combine _))
+
+  def toValidated(implicit F: Functor[F]): F[Validated[A, B]] =
+    F.map(value)(_.toValidated)
+
+  /** Run this value as a `[[Validated]]` against the function and convert it back to an `[[XorT]]`.
+   *
+   * The [[Applicative]] instance for `XorT` "fails fast" - it is often useful to "momentarily" have
+   * it accumulate errors instead, which is what the `[[Validated]]` data type gives us.
+   *
+   * Example:
+   * {{{
+   * val v1: Validated[NonEmptyList[Error], Int] = ...
+   * val v2: Validated[NonEmptyList[Error], Int] = ...
+   * val xort: XorT[Error, Int] = ...
+   *
+   * val result: XorT[NonEmptyList[Error], Int] =
+   *   xort.withValidated { v3 => (v1 |@| v2 |@| v3.leftMap(NonEmptyList(_))) { case (i, j, k) => i + j + k } }
+   * }}}
+   */
+  def withValidated[AA, BB](f: Validated[A, B] => Validated[AA, BB])(implicit F: Functor[F]): XorT[F, AA, BB] =
+    XorT(F.map(value)(xor => f(xor.toValidated).toXor))
 
   def show(implicit show: Show[F[A Xor B]]): String = show.show(value)
 }
@@ -86,12 +115,29 @@ case class XorT[F[_], A, B](value: F[A Xor B]) {
 object XorT extends XorTInstances with XorTFunctions
 
 trait XorTFunctions {
-
   final def left[F[_], A, B](fa: F[A])(implicit F: Functor[F]): XorT[F, A, B] = XorT(F.map(fa)(Xor.left))
 
   final def right[F[_], A, B](fb: F[B])(implicit F: Functor[F]): XorT[F, A, B] = XorT(F.map(fb)(Xor.right))
 
   final def pure[F[_], A, B](b: B)(implicit F: Applicative[F]): XorT[F, A, B] = right(F.pure(b))
+
+  /** Transforms an `Xor` into an `XorT`, lifted into the specified `Applicative`.
+   *
+   * Note: The return type is a FromXorPartiallyApplied[F], which has an apply method
+   * on it, allowing you to call fromXor like this:
+   * {{{
+   * val t: Xor[String, Int] = ...
+   * val x: XorT[Option, String, Int] = fromXor[Option](t)
+   * }}}
+   *
+   * The reason for the indirection is to emulate currying type parameters.
+   */
+  final def fromXor[F[_]]: FromXorPartiallyApplied[F] = new FromXorPartiallyApplied
+
+  final class FromXorPartiallyApplied[F[_]] private[XorTFunctions] {
+    def apply[E, A](xor: Xor[E, A])(implicit F: Applicative[F]): XorT[F, E, A] =
+      XorT(F.pure(xor))
+  }
 }
 
 abstract class XorTInstances extends XorTInstances1 {
@@ -112,6 +158,13 @@ abstract class XorTInstances extends XorTInstances1 {
 
   implicit def xorTShow[F[_], L, R](implicit sh: Show[F[L Xor R]]): Show[XorT[F, L, R]] =
     functor.Contravariant[Show].contramap(sh)(_.value)
+
+  implicit def xorTBifunctor[F[_]](implicit F: Functor[F]): Bifunctor[XorT[F, ?, ?]] = {
+    new Bifunctor[XorT[F, ?, ?]] {
+      override def bimap[A, B, C, D](fab: XorT[F, A, B])(f: A => C, g: B => D): XorT[F, C, D] = fab.bimap(f, g)
+    }
+  }
+
 }
 
 private[data] abstract class XorTInstances1 extends XorTInstances2 {
@@ -135,9 +188,9 @@ private[data] abstract class XorTInstances1 extends XorTInstances2 {
 }
 
 private[data] abstract class XorTInstances2 extends XorTInstances3 {
-  implicit def xorTMonad[F[_], L](implicit F: Monad[F]): Monad[XorT[F, L, ?]] = {
+  implicit def xorTMonadError[F[_], L](implicit F: Monad[F]): MonadError[XorT[F, L, ?], L] = {
     implicit val F0 = F
-    new XorTMonad[F, L] { implicit val F = F0 }
+    new XorTMonadError[F, L] { implicit val F = F0 }
   }
 
   implicit def xorTSemigroupK[F[_], L](implicit F: Monad[F], L: Semigroup[L]): SemigroupK[XorT[F, L, ?]] = {
@@ -159,10 +212,26 @@ private[data] trait XorTFunctor[F[_], L] extends Functor[XorT[F, L, ?]] {
   override def map[A, B](fa: XorT[F, L, A])(f: A => B): XorT[F, L, B] = fa map f
 }
 
-private[data] trait XorTMonad[F[_], L] extends Monad[XorT[F, L, ?]] with XorTFunctor[F, L] {
+private[data] trait XorTMonadError[F[_], L] extends MonadError[XorT[F, L, ?], L] with XorTFunctor[F, L] {
   implicit val F: Monad[F]
   def pure[A](a: A): XorT[F, L, A] = XorT.pure[F, L, A](a)
   def flatMap[A, B](fa: XorT[F, L, A])(f: A => XorT[F, L, B]): XorT[F, L, B] = fa flatMap f
+  def handleErrorWith[A](fea: XorT[F, L, A])(f: L => XorT[F, L, A]): XorT[F, L, A] =
+    XorT(F.flatMap(fea.value) {
+      case Xor.Left(e) => f(e).value
+      case r @ Xor.Right(_) => F.pure(r)
+    })
+  override def handleError[A](fea: XorT[F, L, A])(f: L => A): XorT[F, L, A] =
+    XorT(F.flatMap(fea.value) {
+      case Xor.Left(e) => F.pure(Xor.Right(f(e)))
+      case r @ Xor.Right(_) => F.pure(r)
+    })
+  def raiseError[A](e: L): XorT[F, L, A] = XorT.left(F.pure(e))
+  override def attempt[A](fla: XorT[F, L, A]): XorT[F, L, L Xor A] = XorT.right(fla.value)
+  override def recover[A](fla: XorT[F, L, A])(pf: PartialFunction[L, A]): XorT[F, L, A] =
+    fla.recover(pf)
+  override def recoverWith[A](fla: XorT[F, L, A])(pf: PartialFunction[L, XorT[F, L, A]]): XorT[F, L, A] =
+    fla.recoverWith(pf)
 }
 
 private[data] trait XorTSemigroupK[F[_], L] extends SemigroupK[XorT[F, L, ?]] {
@@ -178,7 +247,7 @@ private[data] trait XorTSemigroupK[F[_], L] extends SemigroupK[XorT[F, L, ?]] {
     })
 }
 
-private[data] trait XorTMonadFilter[F[_], L] extends MonadFilter[XorT[F, L, ?]] with XorTMonad[F, L] {
+private[data] trait XorTMonadFilter[F[_], L] extends MonadFilter[XorT[F, L, ?]] with XorTMonadError[F, L] {
   implicit val F: Monad[F]
   implicit val L: Monoid[L]
   def empty[A]: XorT[F, L, A] = XorT(F.pure(Xor.left(L.empty)))

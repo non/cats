@@ -1,6 +1,8 @@
 package cats
 package data
 
+import cats.functor.Bifunctor
+
 /** Represents a right-biased disjunction that is either an `A`, or a `B`, or both an `A` and a `B`.
  *
  * An instance of `A [[Ior]] B` is one of:
@@ -81,11 +83,14 @@ sealed abstract class Ior[+A, +B] extends Product with Serializable {
     case Ior.Both(a, b) => F.map(g(b))(d => Ior.both(a, d))
   }
 
-  final def foldLeft[C](c: C)(f: (C, B) => C): C = fold(_ => c, f(c, _), (a, b) => f(c, b))
-  final def foldRight[C](c: C)(f: (B, C) => C): C = fold(_ => c, f(_, c), (a, b) => f(b, c))
-  final def partialFold[C](f: B => Fold[C]): Fold[C] = fold(_ => Fold.Pass, f, (a, b) => f(b))
+  final def foldLeft[C](c: C)(f: (C, B) => C): C =
+    fold(_ => c, f(c, _), (_, b) => f(c, b))
 
-  final def merge[AA >: A](implicit ev: B <:< AA, AA: Semigroup[AA]): AA = fold(identity, ev.apply, (a, b) => AA.combine(a, b))
+  final def foldRight[C](lc: Eval[C])(f: (B, Eval[C]) => Eval[C]): Eval[C] =
+    fold(_ => lc, f(_, lc), (_, b) => f(b, lc))
+
+  final def merge[AA >: A](implicit ev: B <:< AA, AA: Semigroup[AA]): AA =
+    fold(identity, ev.apply, (a, b) => AA.combine(a, b))
 
   // scalastyle:off cyclomatic.complexity
   final def append[AA >: A, BB >: B](that: AA Ior BB)(implicit AA: Semigroup[AA], BB: Semigroup[BB]): AA Ior BB = this match {
@@ -139,6 +144,11 @@ sealed abstract class IorInstances extends IorInstances0 {
     def pure[B](b: B): A Ior B = Ior.right(b)
     def flatMap[B, C](fa: A Ior B)(f: B => A Ior C): A Ior C = fa.flatMap(f)
   }
+
+  implicit def iorBifunctor: Bifunctor[Ior] =
+    new Bifunctor[Ior] {
+      override def bimap[A, B, C, D](fab: A Ior B)(f: A => C, g: B => D): C Ior D = fab.bimap(f, g)
+    }
 }
 
 sealed abstract class IorInstances0 {
@@ -148,8 +158,8 @@ sealed abstract class IorInstances0 {
       fa.traverse(f)
     def foldLeft[B, C](fa: A Ior B, b: C)(f: (C, B) => C): C =
       fa.foldLeft(b)(f)
-    def partialFold[B, C](fa: A Ior B)(f: B => Fold[C]): Fold[C] =
-      fa.partialFold(f)
+    def foldRight[B, C](fa: A Ior B, lc: Eval[C])(f: (B, Eval[C]) => Eval[C]): Eval[C] =
+      fa.foldRight(lc)(f)
     override def map[B, C](fa: A Ior B)(f: B => C): A Ior C =
       fa.map(f)
   }
@@ -159,4 +169,26 @@ sealed trait IorFunctions {
   def left[A, B](a: A): A Ior B = Ior.Left(a)
   def right[A, B](b: B): A Ior B = Ior.Right(b)
   def both[A, B](a: A, b: B): A Ior B = Ior.Both(a, b)
+
+  /**
+   * Create an `Ior` from two Options if at least one of them is defined.
+   *
+   * @param oa an element (optional) for the left side of the `Ior`
+   * @param ob an element (optional) for the right side of the `Ior`
+   *
+   * @return `None` if both `oa` and `ob` are `None`. Otherwise `Some` wrapping
+   * an [[Ior.Left]], [[Ior.Right]], or [[Ior.Both]] if `oa`, `ob`, or both are
+   * defined (respectively).
+   */
+  def fromOptions[A, B](oa: Option[A], ob: Option[B]): Option[A Ior B] =
+    oa match {
+      case Some(a) => ob match {
+        case Some(b) => Some(Ior.Both(a, b))
+        case None => Some(Ior.Left(a))
+      }
+      case None => ob match {
+        case Some(b) => Some(Ior.Right(b))
+        case None => None
+      }
+    }
 }

@@ -1,18 +1,36 @@
 package cats
 package laws
 
-import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
-
 import org.scalacheck.Prop
 import org.scalacheck.Prop.{ False, Proof, Result }
 
+import bricks.Platform
+
 /**
  * Check for Java Serializability.
+ *
+ * This laws is only applicative on the JVM, but is something we want
+ * to be sure to enforce. Therefore, we use bricks.Platform to do a
+ * runtime check rather than create a separate jvm-laws project.
  */
 object SerializableLaws {
-  // scalastyle:off null
+
+  // This part is a bit tricky. Basically, we only want to test
+  // serializability on the JVM.
+  //
+  // The Platform.isJs macro will give us a literal true or false at
+  // compile time, so we rely on scalac to prune away the "other"
+  // branch. Thus, when scala.js look at this method it won't "see"
+  // the branch which was removed, and will avoid an error trying to
+  // suport java.io.*.
+  //
+  // This ends up being a lot nicer than having to split the entire
+  // laws project.
+
   def serializable[A](a: A): Prop =
-    Prop { _ =>
+    if (Platform.isJs) Prop(_ => Result(status = Proof)) else Prop { _ =>
+      import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
+
       val baos = new ByteArrayOutputStream()
       val oos = new ObjectOutputStream(baos)
       var ois: ObjectInputStream = null
@@ -25,11 +43,10 @@ object SerializableLaws {
         ois.close()
         Result(status = Proof)
       } catch { case _: Throwable =>
-        Result(status = False)
+          Result(status = False)
       } finally {
         oos.close()
         if (ois != null) ois.close()
       }
     }
-  // scalastyle:on null
 }

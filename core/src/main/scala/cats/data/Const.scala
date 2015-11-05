@@ -28,7 +28,7 @@ final case class Const[A, B](getConst: A) {
     A.compare(getConst, that.getConst)
 
   def show(implicit A: Show[A]): String =
-    s"Const(${A.show(getConst)}})"
+    s"Const(${A.show(getConst)})"
 }
 
 object Const extends ConstInstances {
@@ -52,9 +52,7 @@ sealed abstract class ConstInstances extends ConstInstances0 {
 
     def foldLeft[A, B](fa: Const[C, A], b: B)(f: (B, A) => B): B = b
 
-    override def foldRight[A, B](fa: Const[C, A], b: Lazy[B])(f: A => Fold[B]): Lazy[B] = b
-
-    def partialFold[A, B](fa: Const[C, A])(f: A => Fold[B]): Fold[B] = Fold.Pass
+    def foldRight[A, B](fa: Const[C, A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = lb
   }
 
   implicit def constMonoid[A: Monoid, B]: Monoid[Const[A, B]] = new Monoid[Const[A, B]]{
@@ -77,7 +75,7 @@ sealed abstract class ConstInstances0 extends ConstInstances1 {
       Const.empty
 
     def ap[A, B](fa: Const[C, A])(f: Const[C, A => B]): Const[C, B] =
-      fa.retag[B] combine f.retag[B]
+      f.retag[B] combine fa.retag[B]
   }
 }
 

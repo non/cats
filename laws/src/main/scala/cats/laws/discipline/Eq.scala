@@ -43,9 +43,14 @@ object eq {
     }
   }
 
+
   /**
    * Approximate Eq[ContT[R, M, A]] via approximate Eq for functions.
    */
   implicit def contTEq[R, M[_], A](implicit ev: Eq[M[R]], arb: Arbitrary[M[R]]): Eq[ContT[R, M, A]] =
     Eq.by(_.run _)
+
+  implicit val unitEq: Eq[Unit] = new Eq[Unit] {
+    def eqv(a: Unit, b: Unit): Boolean = true
+  }
 }

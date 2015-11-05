@@ -1,9 +1,11 @@
 package cats
 package data
 
+import cats.data.Validated.{Invalid, Valid}
+import cats.functor.Bifunctor
+
 import scala.reflect.ClassTag
-import cats.data.Validated.{Valid, Invalid}
-import scala.util.{Success, Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 sealed abstract class Validated[+E, +A] extends Product with Serializable {
 
@@ -66,6 +68,13 @@ sealed abstract class Validated[+E, +A] extends Product with Serializable {
    * otherwise return an empty List
    */
   def toList: List[A] = fold(_ => Nil, List(_))
+
+  /** Lift the Invalid value into a NonEmptyList. */
+  def toValidatedNel[EE >: E, AA >: A]: ValidatedNel[EE, AA] =
+    this match {
+      case v @ Valid(_) => v
+      case Invalid(e)   => Validated.invalidNel(e)
+    }
 
   /**
    * Convert this value to RightOr if Valid or LeftOr if Invalid
@@ -133,17 +142,15 @@ sealed abstract class Validated[+E, +A] extends Product with Serializable {
    * apply the given function to the value with the given B when
    * valid, otherwise return the given B
    */
-  def foldLeft[B](b: B)(f: (B, A) => B): B = fold(_ => b, f(b, _))
+  def foldLeft[B](b: B)(f: (B, A) => B): B =
+    fold(_ => b, f(b, _))
 
   /**
    * Lazily-apply the given function to the value with the given B
    * when valid, otherwise return the given B.
    */
-  def foldRight[B](lb: Lazy[B])(f: A => Fold[B]): Lazy[B] =
-    Lazy(partialFold(f).complete(lb))
-
-  def partialFold[B](f: A => Fold[B]): Fold[B] =
-    fold(_ => Fold.Pass, f)
+  def foldRight[B](lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+    fold(_ => lb, a => f(a, lb))
 
   def show[EE >: E, AA >: A](implicit EE: Show[EE], AA: Show[AA]): String =
     fold(e => s"Invalid(${EE.show(e)})",
@@ -167,6 +174,11 @@ sealed abstract class ValidatedInstances extends ValidatedInstances1 {
     def show(f: Validated[A,B]): String = f.show
   }
 
+  implicit def validatedBifunctor: Bifunctor[Validated] =
+    new Bifunctor[Validated] {
+      override def bimap[A, B, C, D](fab: Validated[A, B])(f: A => C, g: B => D): Validated[C, D] = fab.bimap(f, g)
+    }
+
   implicit def validatedInstances[E](implicit E: Semigroup[E]): Traverse[Validated[E, ?]] with Applicative[Validated[E, ?]] =
     new Traverse[Validated[E, ?]] with Applicative[Validated[E,?]] {
       def traverse[F[_]: Applicative, A, B](fa: Validated[E,A])(f: A => F[B]): F[Validated[E,B]] =
@@ -175,8 +187,8 @@ sealed abstract class ValidatedInstances extends ValidatedInstances1 {
       def foldLeft[A, B](fa: Validated[E,A], b: B)(f: (B, A) => B): B =
         fa.foldLeft(b)(f)
 
-      def partialFold[A,B](fa: Validated[E,A])(f: A => Fold[B]): Fold[B] =
-        fa.partialFold(f)
+      def foldRight[A,B](fa: Validated[E,A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+        fa.foldRight(lb)(f)
 
       def pure[A](a: A): Validated[E,A] =
         Validated.valid(a)
@@ -207,6 +219,8 @@ sealed abstract class ValidatedInstances2 {
 trait ValidatedFunctions {
   def invalid[A, B](a: A): Validated[A,B] = Validated.Invalid(a)
 
+  def invalidNel[A, B](a: A): ValidatedNel[A, B] = Validated.Invalid(NonEmptyList(a))
+
   def valid[A, B](b: B): Validated[A,B] = Validated.Valid(b)
 
   /**
@@ -217,9 +231,9 @@ trait ValidatedFunctions {
    * val result: Validated[NumberFormatException, Int] = fromTryCatch[NumberFormatException] { "foo".toInt }
    * }}}
    */
-  def fromTryCatch[T >: Null <: Throwable]: FromTryCatchAux[T] = new FromTryCatchAux[T]
+  def fromTryCatch[T >: Null <: Throwable]: FromTryCatchPartiallyApplied[T] = new FromTryCatchPartiallyApplied[T]
 
-  final class FromTryCatchAux[T] private[ValidatedFunctions] {
+  final class FromTryCatchPartiallyApplied[T] private[ValidatedFunctions] {
     def apply[A](f: => A)(implicit T: ClassTag[T]): Validated[T, A] = {
       try {
         valid(f)

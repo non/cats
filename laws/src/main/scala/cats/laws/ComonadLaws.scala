@@ -5,7 +5,7 @@ import cats.data.Cokleisli
 import cats.implicits._
 
 /**
- * Laws that must be obeyed by any [[Comonad]].
+ * Laws that must be obeyed by any `Comonad`.
  */
 trait ComonadLaws[F[_]] extends CoflatMapLaws[F] {
   implicit override def F: Comonad[F]
@@ -15,15 +15,6 @@ trait ComonadLaws[F[_]] extends CoflatMapLaws[F] {
 
   def mapCoflattenIdentity[A](fa: F[A]): IsEq[F[A]] =
     fa.coflatten.map(_.extract) <-> fa
-
-  def coflattenThroughMap[A](fa: F[A]): IsEq[F[F[F[A]]]] =
-    fa.coflatten.coflatten <-> fa.coflatten.map(_.coflatten)
-
-  def coflattenCoherence[A, B](fa: F[A], f: F[A] => B): IsEq[F[B]] =
-    fa.coflatMap(f) <-> fa.coflatten.map(f)
-
-  def coflatMapIdentity[A, B](fa: F[A]): IsEq[F[F[A]]] =
-    fa.coflatten <-> fa.coflatMap(identity)
 
   def mapCoflatMapCoherence[A, B](fa: F[A], f: A => B): IsEq[F[B]] =
     fa.map(f) <-> fa.coflatMap(fa0 => f(fa0.extract))
@@ -36,14 +27,14 @@ trait ComonadLaws[F[_]] extends CoflatMapLaws[F] {
 
   /**
    * `extract` is the left identity element under left-to-right composition of
-   * [[cats.data.Cokleisli]] arrows. This is analogous to [[comonadLeftIdentity]].
+   * `cats.data.Cokleisli` arrows. This is analogous to [[comonadLeftIdentity]].
    */
   def cokleisliLeftIdentity[A, B](fa: F[A], f: F[A] => B): IsEq[B] =
     (Cokleisli(F.extract[A]) andThen Cokleisli(f)).run(fa) <-> f(fa)
 
   /**
    * `extract` is the right identity element under left-to-right composition of
-   * [[cats.data.Cokleisli]] arrows. This is analogous to [[comonadRightIdentity]].
+   * `cats.data.Cokleisli` arrows. This is analogous to [[comonadRightIdentity]].
    */
   def cokleisliRightIdentity[A, B](fa: F[A], f: F[A] => B): IsEq[B] =
     (Cokleisli(f) andThen Cokleisli(F.extract[B])).run(fa) <-> f(fa)

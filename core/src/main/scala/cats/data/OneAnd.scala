@@ -10,10 +10,10 @@ import scala.collection.mutable.ListBuffer
  * used to represent a List which is guaranteed to not be empty:
  *
  * {{{
- * type NonEmptyList[A] = OneAnd[A, List]
+ * type NonEmptyList[A] = OneAnd[List, A]
  * }}}
  */
-final case class OneAnd[A, F[_]](head: A, tail: F[A]) {
+final case class OneAnd[F[_], A](head: A, tail: F[A]) {
 
   /**
    * Combine the head and tail into a single `F[A]` value.
@@ -32,7 +32,7 @@ final case class OneAnd[A, F[_]](head: A, tail: F[A]) {
   /**
    * Append another OneAnd to this
    */
-  def combine(other: OneAnd[A, F])(implicit F: MonadCombine[F]): OneAnd[A, F] =
+  def combine(other: OneAnd[F, A])(implicit F: MonadCombine[F]): OneAnd[F, A] =
     OneAnd(head, F.combine(tail, F.combine(F.pure(other.head), other.tail)))
 
   /**
@@ -40,6 +40,18 @@ final case class OneAnd[A, F[_]](head: A, tail: F[A]) {
    */
   def find(f: A => Boolean)(implicit F: Foldable[F]): Option[A] =
     if (f(head)) Some(head) else F.find(tail)(f)
+
+  /**
+   * Check whether at least one element satisfies the predicate.
+   */
+  def exists(p: A => Boolean)(implicit F: Foldable[F]): Boolean =
+    p(head) || F.exists(tail)(p)
+
+  /**
+   * Check whether all elements satisfy the predicate.
+   */
+  def forall(p: A => Boolean)(implicit F: Foldable[F]): Boolean =
+    p(head) && F.forall(tail)(p)
 
   /**
    * Left-associative fold on the structure using f.
@@ -50,18 +62,18 @@ final case class OneAnd[A, F[_]](head: A, tail: F[A]) {
   /**
    * Right-associative fold on the structure using f.
    */
-  def foldRight[B](b: Lazy[B])(f: A => Fold[B])(implicit F: Foldable[F]): Lazy[B] =
-    Lazy(f(head).complete(F.foldRight(tail, b)(f)))
+  def foldRight[B](lb: Eval[B])(f: (A, Eval[B]) => Eval[B])(implicit F: Foldable[F]): Eval[B] =
+    Eval.defer(f(head, F.foldRight(tail, lb)(f)))
 
   /**
    * Typesafe equality operator.
    *
    * This method is similar to == except that it only allows two
-   * OneAnd[A, F] values to be compared to each other, and uses
+   * OneAnd[F, A] values to be compared to each other, and uses
    * equality provided by Eq[_] instances, rather than using the
    * universal equality provided by .equals.
    */
-  def ===(that: OneAnd[A, F])(implicit A: Eq[A], FA: Eq[F[A]]): Boolean =
+  def ===(that: OneAnd[F, A])(implicit A: Eq[A], FA: Eq[F[A]]): Boolean =
     A.eqv(head, that.head) && FA.eqv(tail, that.tail)
 
   /**
@@ -75,58 +87,43 @@ final case class OneAnd[A, F[_]](head: A, tail: F[A]) {
     s"OneAnd(${A.show(head)}, ${FA.show(tail)})"
 }
 
-trait OneAndInstances {
+trait OneAndInstances extends OneAndLowPriority1 {
 
-  implicit def oneAndEq[A, F[_]](implicit A: Eq[A], FA: Eq[F[A]]): Eq[OneAnd[A, F]] =
-    new Eq[OneAnd[A, F]]{
-      def eqv(x: OneAnd[A, F], y: OneAnd[A, F]): Boolean = x === y
+  implicit def oneAndEq[A, F[_]](implicit A: Eq[A], FA: Eq[F[A]]): Eq[OneAnd[F, A]] =
+    new Eq[OneAnd[F, A]]{
+      def eqv(x: OneAnd[F, A], y: OneAnd[F, A]): Boolean = x === y
     }
 
-  implicit def oneAndShow[A, F[_]](implicit A: Show[A], FA: Show[F[A]]): Show[OneAnd[A, F]] =
-    Show.show[OneAnd[A, F]](_.show)
+  implicit def oneAndShow[A, F[_]](implicit A: Show[A], FA: Show[F[A]]): Show[OneAnd[F, A]] =
+    Show.show[OneAnd[F, A]](_.show)
 
-  implicit def oneAndFunctor[F[_]](F: Functor[F]): Functor[OneAnd[?, F]] =
-    new Functor[OneAnd[?, F]] {
-      def map[A, B](fa: OneAnd[A, F])(f: A => B): OneAnd[B, F] =
-        OneAnd(f(fa.head), F.map(fa.tail)(f))
-    }
-
-  implicit def oneAndSemigroupK[F[_]: MonadCombine]: SemigroupK[OneAnd[?, F]] =
-    new SemigroupK[OneAnd[?, F]] {
-      def combine[A](a: OneAnd[A, F], b: OneAnd[A, F]): OneAnd[A, F] =
+  implicit def oneAndSemigroupK[F[_]: MonadCombine]: SemigroupK[OneAnd[F, ?]] =
+    new SemigroupK[OneAnd[F, ?]] {
+      def combine[A](a: OneAnd[F, A], b: OneAnd[F, A]): OneAnd[F, A] =
         a combine b
     }
 
-  implicit def oneAndFoldable[F[_]](implicit foldable: Foldable[F]): Foldable[OneAnd[?,F]] =
-    new Foldable[OneAnd[?,F]] {
-      override def foldLeft[A, B](fa: OneAnd[A, F], b: B)(f: (B, A) => B): B =
-        fa.foldLeft(b)(f)
-      override def foldRight[A, B](fa: OneAnd[A, F], b: Lazy[B])(f: A => Fold[B]): Lazy[B] =
-        fa.foldRight(b)(f)
+  implicit def oneAndSemigroup[F[_]: MonadCombine, A]: Semigroup[OneAnd[F, A]] =
+    oneAndSemigroupK.algebra
 
-      override def partialFold[A, B](fa: OneAnd[A,F])(f: A => Fold[B]): Fold[B] = {
-        import Fold._
-        f(fa.head) match {
-          case b @ Return(_) => b
-          case Continue(c) => foldable.partialFold(fa.tail)(f) match {
-            case Return(b) => Return(c(b))
-            case Continue(cc) => Continue { b => c(cc(b)) }
-            case _ => Continue(c)
-          }
-          case _ => foldable.partialFold(fa.tail)(f)
-        }
-      }
+  implicit def oneAndFoldable[F[_]](implicit foldable: Foldable[F]): Foldable[OneAnd[F, ?]] =
+    new Foldable[OneAnd[F, ?]] {
+      override def foldLeft[A, B](fa: OneAnd[F, A], b: B)(f: (B, A) => B): B =
+        fa.foldLeft(b)(f)
+      override def foldRight[A, B](fa: OneAnd[F, A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
+        fa.foldRight(lb)(f)
+      override def isEmpty[A](fa: OneAnd[F, A]): Boolean = false
     }
 
-  implicit def oneAndMonad[F[_]](implicit monad: MonadCombine[F]): Monad[OneAnd[?, F]] =
-    new Monad[OneAnd[?, F]] {
-      override def map[A, B](fa: OneAnd[A,F])(f: A => B): OneAnd[B, F] =
+  implicit def oneAndMonad[F[_]](implicit monad: MonadCombine[F]): Monad[OneAnd[F, ?]] =
+    new Monad[OneAnd[F, ?]] {
+      override def map[A, B](fa: OneAnd[F, A])(f: A => B): OneAnd[F, B] =
         OneAnd(f(fa.head), monad.map(fa.tail)(f))
 
-      def pure[A](x: A): OneAnd[A, F] =
+      def pure[A](x: A): OneAnd[F, A] =
         OneAnd(x, monad.empty)
 
-      def flatMap[A, B](fa: OneAnd[A, F])(f: A => OneAnd[B, F]): OneAnd[B, F] = {
+      def flatMap[A, B](fa: OneAnd[F, A])(f: A => OneAnd[F, B]): OneAnd[F, B] = {
         val end = monad.flatMap(fa.tail) { a =>
           val fa = f(a)
           monad.combine(monad.pure(fa.head), fa.tail)
@@ -137,11 +134,11 @@ trait OneAndInstances {
     }
 }
 
-trait OneAndLowPriority {
-  implicit val nelComonad: Comonad[OneAnd[?, List]] =
-    new Comonad[OneAnd[?, List]] {
+trait OneAndLowPriority0 {
+  implicit val nelComonad: Comonad[OneAnd[List, ?]] =
+    new Comonad[OneAnd[List, ?]] {
 
-      def coflatMap[A, B](fa: OneAnd[A, List])(f: OneAnd[A, List] => B): OneAnd[B, List] = {
+      def coflatMap[A, B](fa: OneAnd[List, A])(f: OneAnd[List, A] => B): OneAnd[List, B] = {
         @tailrec def consume(as: List[A], buf: ListBuffer[B]): List[B] =
           as match {
             case Nil => buf.toList
@@ -150,12 +147,20 @@ trait OneAndLowPriority {
         OneAnd(f(fa), consume(fa.tail, ListBuffer.empty))
       }
 
-      def extract[A](fa: OneAnd[A, List]): A =
+      def extract[A](fa: OneAnd[List, A]): A =
         fa.head
 
-      def map[A, B](fa: OneAnd[A, List])(f: A => B): OneAnd[B, List] =
+      def map[A, B](fa: OneAnd[List, A])(f: A => B): OneAnd[List, B] =
         OneAnd(f(fa.head), fa.tail.map(f))
     }
 }
 
-object OneAnd extends OneAndInstances with OneAndLowPriority
+trait OneAndLowPriority1 extends OneAndLowPriority0 {
+  implicit def oneAndFunctor[F[_]](implicit F: Functor[F]): Functor[OneAnd[F, ?]] =
+    new Functor[OneAnd[F, ?]] {
+      def map[A, B](fa: OneAnd[F, A])(f: A => B): OneAnd[F, B] =
+        OneAnd(f(fa.head), F.map(fa.tail)(f))
+    }
+}
+
+object OneAnd extends OneAndInstances

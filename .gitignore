@@ -13,3 +13,6 @@ TAGS
 .idea/*
 .idea_modules
 .DS_Store
+.sbtrc
+*.sublime-project
+*.sublime-workspace

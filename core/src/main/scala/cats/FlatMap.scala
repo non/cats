@@ -1,9 +1,9 @@
 package cats
 
-import simulacrum._
+import simulacrum.typeclass
 
 /**
- *  FlatMap typeclass gives us flatMap, which allows us to have a value
+ *  FlatMap type class gives us flatMap, which allows us to have a value
  *  in a context (F[A]) and then feed that into a function that takes
  *  a normal value and returns a value in a context (A => F[B]).
  *

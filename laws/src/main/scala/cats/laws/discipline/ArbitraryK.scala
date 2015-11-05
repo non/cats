@@ -2,7 +2,7 @@ package cats
 package laws
 package discipline
 
-import cats.data.{Cokleisli, Kleisli, Validated, Xor, XorT, Ior, Const, ContT}
+import cats.data.{Cokleisli, Kleisli, NonEmptyList, Validated, Xor, XorT, Ior, Const, OptionT, Prod, Func, AppFunc, WriterT, ContT}
 import cats.laws.discipline.arbitrary._
 import org.scalacheck.Arbitrary
 
@@ -13,8 +13,13 @@ trait ArbitraryK[F[_]] {
 }
 
 object ArbitraryK {
-
   def apply[F[_]](implicit arbk: ArbitraryK[F]): ArbitraryK[F] = arbk
+
+  implicit val id: ArbitraryK[Id] =
+    new ArbitraryK[Id] { def synthesize[A: Arbitrary]: Arbitrary[A] = implicitly }
+
+  implicit val nonEmptyList: ArbitraryK[NonEmptyList] =
+    new ArbitraryK[NonEmptyList] { def synthesize[A: Arbitrary]: Arbitrary[NonEmptyList[A]] = implicitly }
 
   implicit val option: ArbitraryK[Option] =
     new ArbitraryK[Option] { def synthesize[A: Arbitrary]: Arbitrary[Option[A]] = implicitly }
@@ -40,10 +45,10 @@ object ArbitraryK {
   implicit val list: ArbitraryK[List] =
     new ArbitraryK[List] { def synthesize[A: Arbitrary]: Arbitrary[List[A]] = implicitly }
 
-  implicit val lazy_ : ArbitraryK[Lazy] =
-    new ArbitraryK[Lazy] {
-      def synthesize[A](implicit A: Arbitrary[A]): Arbitrary[Lazy[A]] =
-        Arbitrary(A.arbitrary.map(Lazy(_)))
+  implicit val eval : ArbitraryK[Eval] =
+    new ArbitraryK[Eval] {
+      def synthesize[A](implicit A: Arbitrary[A]): Arbitrary[Eval[A]] =
+        Arbitrary(A.arbitrary.map(Eval.now(_)))
     }
 
   implicit def mapA[A](implicit A: Arbitrary[A]): ArbitraryK[Map[A, ?]] =
@@ -82,8 +87,23 @@ object ArbitraryK {
   implicit def kleisliA[F[_], A](implicit F: ArbitraryK[F]): ArbitraryK[Kleisli[F, A, ?]] =
     new ArbitraryK[Kleisli[F, A, ?]]{ def synthesize[B: Arbitrary]: Arbitrary[Kleisli[F, A, B]] = implicitly }
 
+  implicit def kleisliE[F[_]](implicit F: ArbitraryK[F]): ArbitraryK[Lambda[A => Kleisli[F, A, A]]] =
+    new ArbitraryK[Lambda[A => Kleisli[F, A, A]]]{ def synthesize[B: Arbitrary]: Arbitrary[Kleisli[F, B, B]] = implicitly }
+
   implicit def cokleisliA[F[_], A]: ArbitraryK[Cokleisli[F, A, ?]] =
     new ArbitraryK[Cokleisli[F, A, ?]]{ def synthesize[B: Arbitrary]: Arbitrary[Cokleisli[F, A, B]] = implicitly }
+
+  implicit def cokleisliE[F[_]](implicit F: ArbitraryK[F]): ArbitraryK[Lambda[A => Cokleisli[F, A, A]]] =
+    new ArbitraryK[Lambda[A => Cokleisli[F, A, A]]]{ def synthesize[B: Arbitrary]: Arbitrary[Cokleisli[F, B, B]] = implicitly }
+
+  implicit def prodA[F[_], G[_]](implicit F: ArbitraryK[F], G: ArbitraryK[G]): ArbitraryK[Lambda[X => Prod[F, G, X]]] =
+    new ArbitraryK[Lambda[X => Prod[F, G, X]]]{ def synthesize[A: Arbitrary]: Arbitrary[Prod[F, G, A]] = implicitly }
+
+  implicit def funcA[F[_], A](implicit F: ArbitraryK[F]): ArbitraryK[Func[F, A, ?]] =
+    new ArbitraryK[Func[F, A, ?]]{ def synthesize[B: Arbitrary]: Arbitrary[Func[F, A, B]] = implicitly }
+
+  implicit def appFuncA[F[_], A](implicit F: ArbitraryK[F], FF: Applicative[F]): ArbitraryK[AppFunc[F, A, ?]] =
+    new ArbitraryK[AppFunc[F, A, ?]]{ def synthesize[B: Arbitrary]: Arbitrary[AppFunc[F, A, B]] = implicitly }
 
   implicit def futureArbitraryK: ArbitraryK[Future] =
     new ArbitraryK[Future] {
@@ -105,4 +125,21 @@ object ArbitraryK {
 
   implicit val vector: ArbitraryK[Vector] =
     new ArbitraryK[Vector] { def synthesize[A: Arbitrary]: Arbitrary[Vector[A]] = implicitly }
+
+  implicit def optionT[F[_]](implicit F: ArbitraryK[F]): ArbitraryK[OptionT[F, ?]] =
+    new ArbitraryK[OptionT[F, ?]] { def synthesize[A: Arbitrary]: Arbitrary[OptionT[F, A]] = implicitly }
+
+  import cats.data.{Streaming, StreamingT}
+
+  implicit val streaming: ArbitraryK[Streaming] =
+    new ArbitraryK[Streaming] { def synthesize[A: Arbitrary]: Arbitrary[Streaming[A]] = implicitly }
+
+  implicit def streamT[F[_]: Monad]: ArbitraryK[StreamingT[F, ?]] =
+    new ArbitraryK[StreamingT[F, ?]] { def synthesize[A: Arbitrary]: Arbitrary[StreamingT[F, A]] = implicitly }
+
+  implicit def writerT[F[_]: ArbitraryK, L: Arbitrary]: ArbitraryK[WriterT[F, L, ?]] =
+    new ArbitraryK[WriterT[F, L, ?]] {
+      def synthesize[A: Arbitrary]: Arbitrary[WriterT[F, L, A]] = Arbitrary(
+        ArbitraryK[F].synthesize[(L, A)].arbitrary.map(WriterT(_)))
+    }
 }
