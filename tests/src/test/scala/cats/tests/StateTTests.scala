@@ -1,10 +1,11 @@
 package cats
 package tests
 
-import cats.laws.discipline.{CartesianTests, MonadStateTests, SerializableTests}
 import cats.data.{State, StateT}
+import cats.laws.discipline.{CartesianTests, MonadStateTests, SerializableTests}
 import cats.laws.discipline.eq._
 import cats.laws.discipline.arbitrary._
+import cats.std.tuple._
 import org.scalacheck.Arbitrary
 
 class StateTTests extends CatsSuite {

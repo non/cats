@@ -217,9 +217,7 @@ lazy val laws = crossProject.crossType(CrossType.Pure)
   .settings(moduleName := "cats-laws")
   .settings(catsSettings:_*)
   .settings(disciplineDependencies:_*)
-  .settings(libraryDependencies ++= Seq(
-    "org.spire-math" %%% "algebra-laws" % "0.3.1",
-    "org.typelevel" %%% "catalysts-platform" % "0.0.2"))
+  .settings(libraryDependencies ++= Seq("org.typelevel" %%% "catalysts-platform" % "0.0.2"))
   .jsSettings(commonJsSettings:_*)
   .jvmSettings(commonJvmSettings:_*)
 
@@ -268,12 +266,6 @@ lazy val publishSettings = Seq(
   scmInfo := Some(ScmInfo(url("https://github.com/typelevel/cats"), "scm:git:git@github.com:typelevel/cats.git")),
   autoAPIMappings := true,
   apiURL := Some(url("http://typelevel.org/cats/api/")),
-  publishArtifact in (Compile, packageDoc) := {
-    CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((2, 10)) => false  // don't package scaladoc when publishing for 2.10
-      case _ => true
-    }
-  },
   pomExtra := (
     <developers>
       <developer>
