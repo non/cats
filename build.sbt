@@ -94,7 +94,8 @@ lazy val commonJsSettings = Seq(
   botBuild := scala.sys.env.get("TRAVIS").isDefined,
   // batch mode decreases the amount of memory needed to compile scala.js code
   scalaJSOptimizerOptions := scalaJSOptimizerOptions.value.withBatchMode(botBuild.value),
-  doctestGenTests := Seq.empty
+  doctestGenTests := Seq.empty,
+  doctestWithDependencies := false
 )
 
 lazy val commonJvmSettings = Seq(
@@ -248,7 +249,7 @@ lazy val core = crossProject.crossType(CrossType.Pure)
   .settings(catsSettings:_*)
   .settings(sourceGenerators in Compile <+= (sourceManaged in Compile).map(Boilerplate.gen))
   .settings(includeGeneratedSrc)
-  .settings(libraryDependencies += "org.scalacheck" %%% "scalacheck" % scalacheckVersion % "test")
+  .settings(libraryDependencies += "org.scalacheck" %%% "scalacheck" % scalaCheckVersion % "test")
   .jsSettings(commonJsSettings:_*)
   .jvmSettings(commonJvmSettings:_*)
 
